@@ -1,0 +1,303 @@
+---
+title: "Road Crash Hotspots: A Comparative Spatial Data Mining Study"
+subtitle: "Data Preparation"
+output: pdf_document
+date: "Fall 2026"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading Data & Packages
+
+```{r, results='hide'}
+# Data
+GDL_raw <- read.csv("../data/raw/GDL/siniestralimap_2015-2025.csv")
+GDL_dict <- read.csv("../data/raw/GDL/diccionario_siniestralimap_2015_2025.csv")
+
+# Packages
+#install.packages("pacman")
+library(pacman)
+pacman::p_load(biostats,ggplot2,dplyr,lubridate,kableExtra)
+```
+
+## Exploratory Data Analysis 
+
+The raw dataset contains **50,433 observations across 36 variables**. Every row
+in the dataset is representative of an individual involved in a car crash. Since 
+the original data is in spanish, we changed the variable names to english and 
+set the appropriate data type for each variable.
+
+```{r}
+# Copy, rename, translate and prepare data ----
+
+GDL_df <- GDL_raw %>%
+  rename(
+    record_number = consecutivo,
+    crash_id = Id,
+    crash_counter = contador_siniestro,
+    date = fecha,
+    year = anio,
+    month = mes,
+    day = dia,
+    day_of_week = dia_sem,
+    time_range = rango_hora,
+    municipality = mun,
+    street_1 = calle_1,
+    street_2 = calle_2,
+    longitude = x,
+    latitude = y,
+    intersection_coord = id_xy_int,
+    crash_type = tipo_siniestro,
+    user_condition = condicion_usuario,
+    user_type = tipo_usuario,
+    vehicle_involved = ibaen_atro,
+    public_trans_jurisdiction = jurisdiccion_tp,
+    sex = sexo,
+    age_range = rango_edad,
+    injury_severity = gravedad,
+    outcome = consecuencia,
+    is_fatality = dmuerto,
+    is_injured = dherido,
+    is_pedestrian = dpeaton,
+    is_cyclist = dbici,
+    is_motorcyclist = dmoto,
+    is_other_vehicle = dotroveh,
+    is_driver = dconductor,
+    is_passenger = dpasajero,
+    is_unknown_user = dileso,
+    involved_persons = involucrados,
+    year_month = mes_anio,
+    injury_hierarchy = herido_jer
+  ) %>%
+  
+  # Standardize unknown values
+  mutate(across(where(is.character),
+                ~ na_if(., "Desconocido"))) %>% # 'Desconocido' means 'Unkown'
+  
+  # Convert dates
+  mutate(
+    date = dmy(date),
+    year_month = ym(year_month),
+    day = as.integer(day),
+
+    # Translate months
+    month = recode(
+      month,
+      "Enero" = "January", "Febrero" = "February",
+      "Marzo" = "March", "Abril" = "April",
+      "Mayo" = "May", "Junio" = "June",
+      "Julio" = "July", "Agosto" = "August",
+      "Septiembre" = "September", "Octubre" = "October",
+      "Noviembre" = "November", "Diciembre" = "December"
+    ),
+
+    # Translate days of the week
+    day_of_week = recode(
+      day_of_week,
+      "Lunes" = "Monday", "Martes" = "Tuesday",
+      "Miércoles" = "Wednesday", "Miercoles" = "Wednesday",
+      "Jueves" = "Thursday", "Viernes" = "Friday",
+      "Sábado" = "Saturday", "Sabado" = "Saturday",
+      "Domingo" = "Sunday"
+    ),
+
+    # Translate crash_type
+    crash_type = recode(
+      crash_type,
+      "Colision con objeto fijo" = "Collision with fixed object",
+      "Colision con persona peatona" = "Collision with pedestrian",
+      "Colision entre dos o mas vehiculos" = "Collision between two or more vehicles",
+      "Otro" = "Other",
+      "Caida de vehiculo" = "Fall from vehicle",
+      "Caida al interior de un autobus" = "Fall inside a bus",
+      "Colision con vehiculo estacionado" = "Collision with parked vehicle",
+      "Derrape y/o volcadura" = "Skidding and/or rollover",
+      "Caida al exterior del autobus" = "Fall from outside of a bus",
+      "Colision con animal" = "Collision with animal"
+    ),
+
+    # Translate user_condition
+    user_condition = recode(
+      user_condition,
+      "Peaton" = "Pedestrian",
+      "Pasajero" = "Passenger",
+      "Conductor" = "Driver"
+    ),
+    
+    # Translate user_type
+    user_type = recode(
+      user_type,
+      "Peaton" = "Pedestrian",
+      "Vehiculo particular" = "Private vehicle",
+      "Transporte empresarial/personal" = "Company/employee transport",
+      "Transporte de carga" = "Freight transport",
+      "Motociclista" = "Motorcyclist",
+      "Transporte publico/pasajeros" = "Public/passenger transport",
+      "Ciclista" = "Cyclist",
+      "Otro vehiculo" = "Other vehicle",
+      "Tren ligero" = "Light rail"
+    ),
+
+    # Translate vehicle_involved
+    vehicle_involved = recode(
+      vehicle_involved,
+      "Otro vehiculo" = "Other vehicle",
+      "Automovil" = "Car",
+      "Van" = "Van",
+      "Camioneta pickup/ carga ligera" = "Pickup/light-duty truck",
+      "Motocicleta" = "Motorcycle",
+      "Autobus" = "Bus",
+      "Bicicleta" = "Bicycle",
+      "Tren" = "Train",
+      "Camion unitario" = "Single-unit truck",
+      "Tractocamion" = "Tractor-trailer",
+      "Tren ligero" = "Light rail",
+      "Autobus articulado" = "Articulated bus",
+      "Motocarro" = "Motorized tricycle",
+      "Patin o scooter" = "Skateboard or scooter",
+      "Suv o todoterreno" = "SUV or off-road vehicle",
+      "Ciclomotor" = "Moped",
+      "Otros vehiculos de baja potencia" = "Other low-powered vehicles"
+    ),
+
+    # Translate sex
+    sex = recode(
+      sex,
+      "Hombre" = "Male",
+      "Mujer" = "Female"
+    ),
+
+    # Translate injury_severity
+    injury_severity = recode(
+      injury_severity,
+      "Traumatismo o lesion" = "Injury",
+      "Traumatismo mortal" = "Fatal injury",
+      "Sin traumatismo aparente en sitio" = "No apparent injury at scene"
+    ),
+    
+    # Translate outcome
+    outcome = recode(
+      outcome,
+      "Lesionado" = "Injured",
+      "Fallecido" = "Deceased",
+      "Ileso" = "Uninjured"
+    ),
+
+    # Convert categorical variables to factors
+    month = factor(month, levels = month.name, ordered = TRUE),
+    day_of_week = factor(
+      day_of_week,
+      levels = c("Monday", "Tuesday", "Wednesday",
+                 "Thursday", "Friday", "Saturday", "Sunday")
+    ),
+    municipality = factor(municipality),
+    time_range = factor(time_range),
+    crash_type = factor(crash_type),
+    user_condition = factor(user_condition),
+    user_type = factor(user_type),
+    vehicle_involved = factor(vehicle_involved),
+    sex = factor(sex),
+    age_range = factor(age_range),
+    injury_severity = factor(injury_severity),
+    outcome = factor(outcome),
+    injury_hierarchy = factor(injury_hierarchy),
+    
+    # Convert dichotomous variables to factors
+    across(
+      c(crash_counter, is_fatality, is_injured, is_pedestrian, is_cyclist,
+        is_motorcyclist, is_other_vehicle, is_driver,
+        is_passenger, is_unknown_user),
+      factor
+    )
+  )
+```
+
+Table 1. Dataset variable descriptions.
+
+| Original | Translated | Type |           Description        |
+|----------|------------|------| ---------------------------- |
+| consecutivo | **record_number** | numeric | Record number |
+| Id | **crash_id** | string | Unique crash id |
+| contador_siniestro | **crash_counter** | binary | First (1) or repeated occurrence (0) |
+| anio | **year** | integer | Year |
+| fecha | **date** | date | Date of the crash in dd/mm/yyyy format |
+| mes | **month** | category | Month in which the crash occurred |
+| dia | **day** | integer | Numerical day of the month |
+| dia_sem | **day_of_week** | string | Day of the week |
+| rango_hora | **time_range** | string | Two-hour interval in which crash occurred |
+| mun | **municipality** | string | Municipality containing nearest intersection |
+| calle_1 | **street_1** | string | Name of the street where the crash occurred |
+| calle_2 | **street_2** | string | Nearest intersecting street |
+| x | **longitude** | Numeric | Longitude of the nearest intersection |
+| y | **latitude** | Numeric | Latitude of the nearest intersection |
+| id_xy_int | **intersection_coord** | string | Coordinates of the nearest intersection | 
+| tipo_siniestro | **crash_type** | string | Type of road crash |
+| condicion_usuario | **user_condition** | category | Role of the person involved |
+| tipo_usuario | **user_type** | category | User classification |
+| ibaen_atro | **vehicle_involved** | category | Type of vehicle involved in the crash |
+| jurisdiccion_tp | **-** | - | Empty and not described in data dictionary | 
+| sexo | **sex** | Character | Sex of the person involved.
+| rango_edad | **age_range** | Character | Age range of the person involved |
+| gravedad | **injury_severity** | Character | Severity of trauma resulting from the crash |
+| consecuencia | **outcome** | Character | Injury classification |
+| dmuerto | **is_fatality** | Integer | Indicates if  person involved died (1 = yes) |
+| dherido | **is_injured** | Integer | Was person involved injured? (1 = yes) |
+| dpeaton | **is_pedestrian** | Integer | Was person involved a pedestrian? (1 = yes) |
+| dbici | **is_cyclist** | Integer | Was person involved a cyclist? (1 = yes) |
+| dmoto | **is_motorcyclist** | Integer | Was person involved a motorcyclist? (1 = yes) |
+| dotroveh | **is_other_vehicle** | Integer | Did person use another vehicle type? (1 = yes) |
+| dconductor | **is_driver** | Integer | Was the person involved a driver? (1 = yes) |
+| dpasajero | **is_passenger** | Integer | Was person involved a passenger? (1 = yes) |
+| dileso | **is_unknown_user** | Integer | Was person involved uninjured? (1 = yes) |
+| involucrados | **involved_persons** | Integer | Indicator of count of involved persons |
+| mes_anio | **year_month** | Character | Month-year combination |
+| herido_jer | **injury_hierarchy** | Character | Injury hierarchy |
+
+```{r}
+str(GDL_df)
+```
+
+First of all, we can delete the *jurisdiccion_tp* and *involved_persons* variables 
+from the dataset, due to the former being completely empty and the later being all 
+of class '1' (Fig. 1).
+
+```{r fig.show="hold", out.width="49%", fig.align='center', fig.cap="Distribution of missing values across variables (left) and classification of involved\\_persons (right).", echo=FALSE}
+missing_values(GDL_df)$bar_plot + labs(title = NULL, subtitle = NULL) 
+plot_bar(GDL_df, "involved_persons")
+```
+
+```{r}
+GDL_df$public_trans_jurisdiction <- NULL
+GDL_df$involved_persons <- NULL
+```
+
+Every row in the dataset is representative of an individual involved in a crash. We can 
+determine the number of **unique crashes** based on the *crash_id* variable. 
+
+```{r eval=FALSE}
+# Unique crashes and records
+GDL_df %>%
+  summarise(
+    observations = n(),
+    unique_crashes = n_distinct(crash_id),
+    missing_crash_ids = sum(is.na(crash_id))
+  ) %>%
+  kable()
+```
+
+\begin{center}Table 2. Unique crashes vs total observations.\end{center}
+
+```{r echo=FALSE}
+# Unique crashes and records
+GDL_df %>%
+  summarise(
+    observations = n(),
+    unique_crashes = n_distinct(crash_id),
+    missing_crash_ids = sum(is.na(crash_id))
+  ) %>%
+  kable()
+```
+
+
