@@ -5,7 +5,7 @@
 ![R](https://img.shields.io/badge/R-276DC3?style=flat&logo=r&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 ![Status](https://img.shields.io/badge/Status-In%20Development-orange)
-![GitHub last commit](https://img.shields.io/github/last-commit/sebasquirarte/mapping-road-crash-hotspots)
+![GitHub last commit](https://img.shields.io/github/last-commit/sebasquirarte/Roadcrash-Hotspots-Spatial-Analysis/)
 
 ## Project Description
 
